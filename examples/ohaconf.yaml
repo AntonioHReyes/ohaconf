@@ -1,0 +1,69 @@
+# ohaconf.yaml — Ejemplo completo de configuración
+#
+# Variables globales: se pueden usar ${VAR} en cualquier campo.
+# Las variables del sistema tienen precedencia sobre las definidas aquí.
+env:
+  BASE_URL: http://localhost:8080
+  TOKEN: ${API_TOKEN}   # toma el valor de la variable de entorno API_TOKEN
+
+# Valores por defecto aplicables a todos los tests (pueden sobreescribirse por test)
+defaults:
+  requests: 200
+  connections: 50
+  headers:
+    Authorization: "Bearer ${TOKEN}"
+    Accept: application/json
+
+tests:
+  - name: dashboard_client_232
+    description: Dashboard mensual del cliente 232
+    method: GET
+    url: "${BASE_URL}/web/clients/232/dashboard"
+    query_params:
+      startDate: "2025-01-01"
+      endDate: "2025-01-31"
+    requests: 100
+    connections: 50
+    weight: 70
+    tags: [dashboard, read]
+
+  - name: dashboard_client_233
+    description: Dashboard mensual del cliente 233
+    method: GET
+    url: "${BASE_URL}/web/clients/233/dashboard"
+    query_params:
+      startDate: "2025-01-01"
+      endDate: "2025-01-31"
+    weight: 20
+    tags: [dashboard, read]
+
+  - name: create_session
+    description: Crea una sesión de usuario
+    method: POST
+    url: "${BASE_URL}/api/sessions"
+    headers:
+      Content-Type: application/json
+    body: |
+      {"clientId": 232, "type": "standard"}
+    requests: 50
+    connections: 10
+    weight: 10
+    tags: [sessions, write]
+
+  - name: health_check
+    description: Health check rápido
+    method: GET
+    url: "${BASE_URL}/health"
+    requests: 500
+    connections: 100
+    tags: [health]
+
+  - name: slow_report
+    description: Reporte con tiempo de espera extendido
+    method: GET
+    url: "${BASE_URL}/api/reports/annual"
+    timeout: "30s"
+    duration: "30s"
+    connections: 5
+    query_per_second: 2
+    tags: [reports, read]
