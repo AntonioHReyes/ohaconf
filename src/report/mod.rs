@@ -41,23 +41,29 @@ impl OhaResult {
         let s = &self.raw;
 
         let summary = &s["summary"];
-        let dist = &s["latencyDistribution"];
+        let percentiles = &s["latencyPercentiles"];
+        let status_codes = &s["statusCodeDistribution"];
 
-        let total_requests = summary["total"].as_u64().unwrap_or(0);
+        // Total requests = suma de todos los status codes registrados
+        let total_requests: u64 = if let Some(obj) = status_codes.as_object() {
+            obj.values().filter_map(|v| v.as_u64()).sum()
+        } else {
+            0
+        };
+
         let success_rate = summary["successRate"].as_f64().unwrap_or(0.0) * 100.0;
         let requests_per_sec = summary["requestsPerSec"].as_f64().unwrap_or(0.0);
         let avg_ms = to_ms(summary["average"].as_f64().unwrap_or(0.0));
         let slowest_ms = to_ms(summary["slowest"].as_f64().unwrap_or(0.0));
         let fastest_ms = to_ms(summary["fastest"].as_f64().unwrap_or(0.0));
 
-        // Latency distribution percentiles
-        let p50_ms = to_ms(get_percentile(dist, 50));
-        let p90_ms = to_ms(get_percentile(dist, 90));
-        let p95_ms = to_ms(get_percentile(dist, 95));
-        let p99_ms = to_ms(get_percentile(dist, 99));
+        // Percentiles desde latencyPercentiles (objeto plano: {"p50": ..., "p90": ...})
+        let p50_ms = to_ms(percentiles["p50"].as_f64().unwrap_or(0.0));
+        let p90_ms = to_ms(percentiles["p90"].as_f64().unwrap_or(0.0));
+        let p95_ms = to_ms(percentiles["p95"].as_f64().unwrap_or(0.0));
+        let p99_ms = to_ms(percentiles["p99"].as_f64().unwrap_or(0.0));
 
-        // Errores: requests - success
-        let status_codes = &s["statusCodeDistribution"];
+        // Errores = requests con status != 2xx
         let total_success: u64 = if let Some(obj) = status_codes.as_object() {
             obj.iter()
                 .filter(|(k, _)| k.starts_with('2'))
@@ -87,16 +93,4 @@ impl OhaResult {
 
 fn to_ms(secs: f64) -> f64 {
     (secs * 1000.0 * 100.0).round() / 100.0
-}
-
-fn get_percentile(dist: &serde_json::Value, p: u64) -> f64 {
-    // oha devuelve latencyDistribution como array de objetos {percentage, latency}
-    if let Some(arr) = dist.as_array() {
-        for item in arr {
-            if item["percentage"].as_u64() == Some(p) {
-                return item["latency"].as_f64().unwrap_or(0.0);
-            }
-        }
-    }
-    0.0
 }
