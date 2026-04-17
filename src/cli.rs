@@ -27,6 +27,9 @@ pub enum Commands {
     Validate,
 
     /// Ejecuta un test (interactivo si no se especifica --test)
+    ///
+    /// Por defecto muestra el TUI de oha con los gráficos en vivo.
+    /// Usa --capture o --output para obtener el resumen en tabla.
     Run {
         /// Nombre del test a ejecutar
         #[arg(short = 't', long = "test")]
@@ -36,11 +39,15 @@ pub enum Commands {
         #[arg(long = "tag")]
         tag: Option<String>,
 
-        /// Mostrar TUI de oha en lugar de capturar output
-        #[arg(long = "pass-tui")]
+        /// Forzar TUI de oha (default cuando se corre un solo test)
+        #[arg(long = "pass-tui", conflicts_with = "capture")]
         pass_tui: bool,
 
-        /// Guardar resultado en archivo (JSON)
+        /// Capturar output JSON y mostrar resumen (deshabilita TUI)
+        #[arg(long = "capture")]
+        capture: bool,
+
+        /// Guardar resultado en archivo (JSON). Implica --capture.
         #[arg(short = 'o', long = "output")]
         output: Option<String>,
 

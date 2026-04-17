@@ -29,8 +29,8 @@ fn run() -> Result<()> {
     match cli.command {
         Commands::List => cmd_list(config_path),
         Commands::Validate => cmd_validate(config_path),
-        Commands::Run { test, tag, pass_tui, output, dry_run, show_secrets } => {
-            cmd_run(config_path, test, tag, pass_tui, output, dry_run, show_secrets)
+        Commands::Run { test, tag, pass_tui, capture, output, dry_run, show_secrets } => {
+            cmd_run(config_path, test, tag, pass_tui, capture, output, dry_run, show_secrets)
         }
         Commands::RunAll { parallel, output, tag } => {
             cmd_run_all(config_path, parallel, output, tag)
@@ -117,6 +117,7 @@ fn cmd_run(
     test_name: Option<String>,
     tag: Option<String>,
     pass_tui: bool,
+    capture: bool,
     output: Option<String>,
     dry_run: bool,
     show_secrets: bool,
@@ -151,7 +152,12 @@ fn cmd_run(
         return Ok(());
     }
 
-    if pass_tui {
+    // Modo TUI por defecto para un solo test, salvo que el usuario pida capturar
+    // (--capture) o guardar el resultado (--output), que requieren JSON.
+    let needs_capture = capture || output.is_some();
+    let use_tui = pass_tui || !needs_capture;
+
+    if use_tui {
         executor::run_passthrough(&test)?;
         return Ok(());
     }

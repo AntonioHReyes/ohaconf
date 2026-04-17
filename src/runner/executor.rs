@@ -8,14 +8,25 @@ use crate::runner::oha_command;
 
 /// Ejecuta oha y retorna el JSON parseado
 pub fn run(test: &TestCase) -> Result<OhaResult> {
-    let args = oha_command::build_args(test, true);
-    let redacted = oha_command::build_args_redacted(test, true);
+    run_inner(test, true)
+}
 
-    println!(
-        "{} {}",
-        "▶ Ejecutando:".cyan().bold(),
-        oha_command::format_command(&redacted).dimmed()
-    );
+/// Igual que `run` pero sin imprimir el log de ejecución (para paralelo).
+pub fn run_quiet(test: &TestCase) -> Result<OhaResult> {
+    run_inner(test, false)
+}
+
+fn run_inner(test: &TestCase, verbose: bool) -> Result<OhaResult> {
+    let args = oha_command::build_args(test, true);
+
+    if verbose {
+        let redacted = oha_command::build_args_redacted(test, true);
+        println!(
+            "{} {}",
+            "▶ Ejecutando:".cyan().bold(),
+            oha_command::format_command(&redacted).dimmed()
+        );
+    }
 
     let output = Command::new("oha")
         .args(&args)
@@ -67,15 +78,28 @@ pub fn run_parallel(tests: &[TestCase]) -> Vec<(String, Result<OhaResult>)> {
 
     let results: Arc<Mutex<Vec<(String, Result<OhaResult>)>>> =
         Arc::new(Mutex::new(Vec::new()));
+    let print_lock: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
 
     let handles: Vec<_> = tests
         .iter()
         .map(|test| {
             let test = test.clone();
             let results = Arc::clone(&results);
+            let print_lock = Arc::clone(&print_lock);
             thread::spawn(move || {
                 let name = test.name.clone();
-                let result = run(&test);
+                {
+                    let _guard = print_lock.lock().unwrap();
+                    println!("  {} {}", "▶".cyan(), name.dimmed());
+                }
+                let result = run_quiet(&test);
+                {
+                    let _guard = print_lock.lock().unwrap();
+                    match &result {
+                        Ok(_) => println!("  {} {}", "✓".green(), name.dimmed()),
+                        Err(e) => println!("  {} {} ({})", "✗".red(), name.dimmed(), e),
+                    }
+                }
                 results.lock().unwrap().push((name, result));
             })
         })
